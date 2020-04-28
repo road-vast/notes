@@ -1,0 +1,12 @@
+同时启动多个tomcat：
+https://blog.csdn.net/m0_37775748/article/details/99982903?depth_1-utm_source=distribute.pc_relevant.none-task-blog-BlogCommendFromBaidu-1&utm_source=distribute.pc_relevant.none-task-blog-BlogCommendFromBaidu-1
+
+springboot+nginx实现负载均衡：
+https://blog.csdn.net/pilihaotian/article/details/88016748
+
+windows云服务器上配置nginx将http转为https
+https://www.cnblogs.com/kui-technology/p/10972634.html
+
+ 
+
+

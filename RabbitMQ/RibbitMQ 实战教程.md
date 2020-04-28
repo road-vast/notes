@@ -1015,6 +1015,36 @@ docker exec -it myrabbit3 rabbitmq-plugins enable rabbitmq_management
 
 ​																			【开启镜像模式成功】
 
+## *附加2 Windows下安装配置RabbitMQ
+
+~~~
+Windews环境下下载Rabbit开启过程：
+1.下载erlang和RabbitMQ：注意版本匹配问题
+
+2.配置erlang环境变量，在cmd中输入erl显示版本表示配置成功；
+
+3.配置RabbitMQ环境变量；
+进入-》任务管理器-》服务：打开RabbitMq服务；
+
+4.开启RabbitMQ管理插件：rabbitmq-plugins enable rabbitmq_management；
+
+5.如果访问不了管理界面：尝试输入
+rabbitmq-server status
+然后进入对应的配置文件，再关闭；
+
+6.开启允许远程访问：
+更改5中配置文件内容：[{rabbit, [{loopback_users, [guest]}]}].
+
+7.常用命令：
+对应插件列表：rabbitmq-plugins list
+rabbitmq-service start启动服务
+rabbitmq-service stop停止服务 
+rabbitmq-service install装载服务
+rabbitmq-service remove删除服务
+~~~
+
+
+
 ## 7. RabbitMQ的集群
 
 ### 7.1 集群架构
