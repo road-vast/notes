@@ -332,6 +332,8 @@ public class PaymentController {
 }
 ```
 
+------
+
 ##### 开启热部署
 
 第一步：
@@ -350,11 +352,102 @@ public class PaymentController {
 
 ![image-20200430132138856](.\images\开启热部署4.png)
 
+------
+
 ##### 2.cloud-consumer-order80  消费者订单模块
+
+###### 1）为什么使用80端口？
+
+因为80是浏览器的默认端口
 
 ![image-20200430133742104](.\images\port80介绍.png)
 
- 
+###### 2）怎么调用支付模块？
+
+一般情况下，消费者通过httpClient来调用微服务提供者提供的服务，这里restTemplate封装了httpTemplate，因此使用它即可。
+
+![image-20200430170212055](D:\notes\SpringCloud\images\调用支付Module流程.png)
+
+------
+
+###### 3）RestTemplate
+
+RestTemplate是什么？
+
+![image-20200430171005925](.\images\RestTemplate1.png)
+
+[RestTemplate官网地址](https://docs.spring.io/spring-framework/docs/5.2.2.RELEASE/javadoc-api/org/springframework/web/client/RestTemplate.html)
+
+使用：
+
+![image-20200430171705186](.\images\RestTemplate2.png)
+
+##### （4）具体操作：
+
+第一步 配置config类：
+
+```java
+package com.atguigu.springcloud.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestTemplate;
+
+@Configuration
+public class ApplicationContextConfig {
+    @Bean
+    public RestTemplate getRestTemplate(){
+        return new RestTemplate();
+    }
+}
+```
+
+第二步：编写Controller类
+
+```java
+package com.atguigu.springcloud.controller;
+
+import com.atguigu.springcloud.entities.CommonResult;
+import com.atguigu.springcloud.entities.Payment;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+
+import javax.annotation.Resource;
+
+@RestController
+@Slf4j
+public class OrderController {
+    private static final String PAYMENT_URL = "http://localhost:8001";
+    @Resource
+    private RestTemplate restTemplate;
+
+    @PostMapping("/consumer/payment/create")
+    public CommonResult create(Payment payment){
+        return restTemplate.postForObject(PAYMENT_URL + "/payment/create", payment, CommonResult.class);
+    }
+
+    @GetMapping("/consumer/payment/get/{id}")
+    public CommonResult getPayment(@PathVariable("id") Long id){
+        return restTemplate.getForObject(PAYMENT_URL + "/payment/get/" + id, CommonResult.class);
+    }
+}
+```
+
+##### （5）注意：
+
+==消费者模块使用create方法将Payment对象以json数据形式传给支付模块，支付模块必须在Controller层中的对应方法上使用@RequestBody才能进行接收。否则接收不到数据，数据库没有插入数据。==
+
+![image-20200430182702036](.\images\customer插入注意1.png)
+
+![image-20200430182755767](.\images\customer插入注意2.png)
+
+插入成功：
+
+![image-20200430182902115](D:\notes\SpringCloud\images\customer插入注意3.png)
 
 
 
@@ -376,7 +469,15 @@ public class PaymentController {
 
 
 
-## 三、导入jar包错误问题
+
+
+
+
+
+
+## 三、错误处理
+
+### 1.导入jar包错误问题
 
 1.默认的配置文件中使用的仓库是maven的中央仓库，有些老版本的spring包在最新的maven仓库中找不到，那么碰到这种情况我们应该怎么解决呢？
 
@@ -409,3 +510,54 @@ public class PaymentController {
 ==解决方案：==
 
 ![image-20200429111044036](D:\notes\SpringCloud\images\解决mybatis爆红.png)
+
+### 2.新建Module时maven界面对应的module为灰色
+
+原因：父工程没有对其进行管理
+
+![image-20200430164113050](.\images\Module灰色错误1.png)
+
+第一步：
+
+![image-20200430164211158](.\images\Module灰色错误2.png)
+
+第二步：
+
+![image-20200430164230408](.\images\Module灰色错误3.png)
+
+完成：
+
+![image-20200430165054292](.\images\Module灰色错误4.png)
+
+------
+
+### 3.没有自动出现Run Dashboard
+
+（Spring2019.3 的Run Dashboard改Services）
+
+做法：
+
+![image-20200430184249070](.\images\没有出现Run Dashboard4.png)
+
+第一步：
+
+![image-20200430184124698](.\images\没有出现Run Dashboard1.png)
+
+第二步：
+
+![image-20200430184159559](.\images\没有出现Run Dashboard2.png)
+
+第三步：
+
+![image-20200430184231826](.\images\没有出现Run Dashboard3.png)
+
+插入代码内容：
+
+~~~java
+<option name="configurationTypes">
+	<set>
+		<option value="SpringBootApplicationConfigurationType" />
+	</set>
+</option>
+~~~
+
