@@ -1,45 +1,41 @@
-# SpringCloud
+# 一、编码前准备
 
-## 一、编码前准备
+## 1.版本控制
 
-### 1.版本控制
+![image-20200428192729155](.\images\版本控制.png)
 
-![image-20200428192729155](D:\notes\SpringCloud\images\版本控制.png)
+## 2.学习内容
 
-### 2.学习内容
-
-![image-20200428193012210](D:\notes\SpringCloud\images\学习内容.png)
+![image-20200428193012210](.\images\学习内容.png)
 
 ------
 
-## 二、开始编码
+# 1 微服务架构编码构建
 
-### 1 微服务架构编码构建
-
-#### 1.规矩
+## 1.规矩
 
 约定>配置>编码
 
 ------
 
-#### 2.IDEA新建Project工作空间
+## 2.IDEA新建Project工作空间
 
 总父工程POM：先建立project，然后再建立module。
 
 微服务Cloud整体聚合父工程Project建立步骤：
 
-1. New Project	![image-20200428200053148](D:\notes\SpringCloud\images\new pproject.png)
+1. New Project	![image-20200428200053148](.\images\new pproject.png)
 2. 聚合总父工程名字
-3. Maven选版本![maven3-5-2 ](D:\notes\SpringCloud\images\maven3-5-2 .png)
+3. Maven选版本![maven3-5-2 ](.\images\maven3-5-2 .png)
 4. 工程名字
-5. 字符编码![image-20200428224127986](D:\notes\SpringCloud\images\字符编码.png)
-6. 注解生效激活![image-20200428224350516](D:\notes\SpringCloud\images\注解生效激活.png)
-7. java编译版本选8![image-20200428224552963](D:\notes\SpringCloud\images\java8.png)
-8. File Type过滤![image-20200428224956223](D:\notes\SpringCloud\images\File Type过滤.png)
+5. 字符编码![image-20200428224127986](.\images\字符编码.png)
+6. 注解生效激活![image-20200428224350516](.\images\注解生效激活.png)
+7. java编译版本选8![image-20200428224552963](.\images\java8.png)
+8. File Type过滤![image-20200428224956223](.\images\File Type过滤.png)
 
 ------
 
-#### 3.配置DepencyManagement
+## 3.配置DepencyManagement
 
 1.DepencyManagement应用场景
 
@@ -47,21 +43,21 @@
 
 2.实现：
 
-1. 指定这是一个POM工程![image-20200429082554595](D:\notes\SpringCloud\images\指定是一个pom工程.png)
-2. 使用properties标签，可以在properties下声明相应的版本信息，然后在dependency下引用的时候用${spring-version}就可以引入该版本jar包了![image-20200429082622518](D:\notes\SpringCloud\images\properties统一管理jar包版本.png)
-3. 引入各种jar包需要使用到的版本号![image-20200429082659404](D:\notes\SpringCloud\images\dependencyManagement.png)
+1. 指定这是一个POM工程![image-20200429082554595](.\images\指定是一个pom工程.png)
+2. 使用properties标签，可以在properties下声明相应的版本信息，然后在dependency下引用的时候用${spring-version}就可以引入该版本jar包了![image-20200429082622518](.\images\properties统一管理jar包版本.png)
+3. 引入各种jar包需要使用到的版本号![image-20200429082659404](.\images\dependencyManagement.png)
 
-#### 4.引入Build标签的时候会报错
+## 4.引入Build标签的时候会报错
 
 当前解决方式：增加版本号
 
-![image-20200429093045810](D:\notes\SpringCloud\images\spring-boot-maven-plugin爆红.png)
+![image-20200429093045810](.\images\spring-boot-maven-plugin爆红.png)
 
 ------
 
-### 2 Rest微服务工程构建
+# 2 Rest微服务工程构建
 
-#### 构建步骤
+## 构建步骤
 
 ==微服务模块构建步骤：==
 
@@ -73,35 +69,35 @@
 
 ------
 
-##### 1.cloud-provider-payment8001微服务提供者支付Module模块
+### 1.cloud-provider-payment8001微服务提供者支付Module模块
 
-![image-20200429093732866](D:\notes\SpringCloud\images\支付Module模块.png)
+![image-20200429093732866](.\images\支付Module模块.png)
 
-###### 1.建module
+#### 1.建module
 
 第一步：
 
-![image-20200429094950613](D:\notes\SpringCloud\images\建立支付module第一步.png)
+![image-20200429094950613](.\images\建立支付module第一步.png)
 
 第二步：
 
-![image-20200429095024195](D:\notes\SpringCloud\images\建立支付模块第二步.png)
+![image-20200429095024195](.\images\建立支付模块第二步.png)
 
 第三步：
 
-![image-20200429095054772](D:\notes\SpringCloud\images\建立支付module第三步.png)
+![image-20200429095054772](.\images\建立支付module第三步.png)
 
 建立完成：
 
-![image-20200429095119772](D:\notes\SpringCloud\images\支付Module建立完成.png)
+![image-20200429095119772](.\images\支付Module建立完成.png)
 
 ------
 
-###### 2.改pom
+#### 2.改pom
 
-![image-20200429111848721](D:\notes\SpringCloud\images\支付module改pom.png)
+![image-20200429111848721](.\images\支付module改pom.png)
 
-###### 3.写yml
+#### 3.写yml
 
 ```java
 server:
@@ -124,7 +120,7 @@ mybatis:
   type-aliases-package: com.atguigu.springcloud.entities
 ```
 
-###### 4.主启动
+#### 4.主启动
 
 ```java
 package com.atguigu.springcloud;
@@ -144,7 +140,7 @@ public class PaymentMain8001 {
 }
 ```
 
-###### 5.业务类
+#### 5.业务类
 
 1.建表SQL
 
@@ -334,7 +330,7 @@ public class PaymentController {
 
 ------
 
-##### 开启热部署
+### *开启热部署
 
 第一步：
 
@@ -354,23 +350,23 @@ public class PaymentController {
 
 ------
 
-##### 2.cloud-consumer-order80  消费者订单模块
+### 2.cloud-consumer-order80  消费者订单模块
 
-###### 1）为什么使用80端口？
+#### 1）为什么使用80端口？
 
 因为80是浏览器的默认端口
 
 ![image-20200430133742104](.\images\port80介绍.png)
 
-###### 2）怎么调用支付模块？
+#### 2）怎么调用支付模块？
 
 一般情况下，消费者通过httpClient来调用微服务提供者提供的服务，这里restTemplate封装了httpTemplate，因此使用它即可。
 
-![image-20200430170212055](D:\notes\SpringCloud\images\调用支付Module流程.png)
+![image-20200430170212055](.\images\调用支付Module流程.png)
 
 ------
 
-###### 3）RestTemplate
+#### 3）RestTemplate
 
 RestTemplate是什么？
 
@@ -382,7 +378,7 @@ RestTemplate是什么？
 
 ![image-20200430171705186](.\images\RestTemplate2.png)
 
-##### （4）具体操作：
+#### 4）具体操作：
 
 第一步 配置config类：
 
@@ -437,7 +433,7 @@ public class OrderController {
 }
 ```
 
-##### （5）注意：
+#### 5）*注意：
 
 ==消费者模块使用create方法将Payment对象以json数据形式传给支付模块，支付模块必须在Controller层中的对应方法上使用@RequestBody才能进行接收。否则接收不到数据，数据库没有插入数据。==
 
@@ -447,7 +443,129 @@ public class OrderController {
 
 插入成功：
 
-![image-20200430182902115](D:\notes\SpringCloud\images\customer插入注意3.png)
+![image-20200430182902115](.\images\customer插入注意3.png)
+
+### 3.工程重构
+
+（1）观察问题：
+
+![image-20200430193054869](.\images\工程重构1.png)
+
+（2）新建
+
+新建一个 cloud-api-commons Module
+
+（3）POM
+
+![image-20200430194311142](.\images\工程重构2.png)
+
+（4）entities
+
+复制entities包到新建的Module的对应位置中
+
+（5）maven clean install命令
+
+![image-20200430194956114](.\images\工程重构3.png)
+
+（6）订单80和支付8001分别改造
+
+![image-20200430195103541](.\images\工程重构4.png)
+
+引入相关依赖
+
+```java
+<dependency><!-- 引入自己定义的api通用包，可以使用Payment支付Entity -->
+    <groupId>com.atguigu.springcloud</groupId>
+    <artifactId>cloud-api-commons</artifactId>
+    <version>${project.version}</version>
+</dependency>
+```
+
+------
+
+# 3.Eureka服务注册与发现
+
+## *加入Eureka之后的效果
+
+![image-20200430221033109](.\images\加入Eureka效果.jpg)
+
+------
+
+## （1）Eureka基础知识
+
+### 1）什么是服务治理？
+
+![image-20200430215718801](D:\notes\SpringCloud\images\服务治理1.png)
+
+### 2）什么是服务注册？
+
+![image-20200430220525659](D:\notes\SpringCloud\images\服务注册.png)
+
+3）Eureka的两个组件
+
+![image-20200430220616796](D:\notes\SpringCloud\images\Eureka的两个组件.png)
+
+------
+
+## （2）单机Eureka构建步骤：
+
+![image-20200430221422214](.\images\单机Eureka构建步骤.png)
+
+### 1.建Module
+
+### 2.改POM
+
+*1.X 和 2.X的对比说明
+
+![image-20200430222901902](.\images\Eureka版本比较.png)
+
+------
+
+![image-20200430230244048](D:\notes\SpringCloud\images\Eureka依赖.png)
+
+------
+
+### 3.写yml
+
+```java
+server:
+  port: 7001
+
+eureka:
+  instance:
+    hostname: localhost #eureka服务端的实例名称
+  client:
+    #false表示不向注册中心注册自己。
+    register-with-eureka: false
+    #false表示自己端就是注册中心，我的职责就是维护服务实例，并不需要去检索服务
+    fetch-registry: false
+    service-url:
+    #设置与Eureka Server交互的地址查询服务和注册服务都需要依赖这个地址
+      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+```
+
+### 4.主启动
+
+```java
+package com.atguigu.springcloud;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.netflix.eureka.server.EnableEurekaServer;
+
+@SpringBootApplication
+//代表这个模块是Eureka的服务注册中心
+@EnableEurekaServer
+public class EurekaMain7001 {
+    public static void main(String[] args) {
+        SpringApplication.run(EurekaMain7001.class);
+    }
+}
+```
+
+### 5.启动
+
+访问7001端口-----》 [Eureka](http://localhost:7001/)
 
 
 
@@ -475,9 +593,11 @@ public class OrderController {
 
 
 
-## 三、错误处理
 
-### 1.导入jar包错误问题
+
+# 三、错误处理
+
+## 1.导入jar包错误问题
 
 1.默认的配置文件中使用的仓库是maven的中央仓库，有些老版本的spring包在最新的maven仓库中找不到，那么碰到这种情况我们应该怎么解决呢？
 
@@ -505,13 +625,13 @@ public class OrderController {
 
 2.导入mybatis爆红
 
-![image-20200429110916988](D:\notes\SpringCloud\images\导入mybatis爆红.png)
+![image-20200429110916988](.\images\导入mybatis爆红.png)
 
 ==解决方案：==
 
-![image-20200429111044036](D:\notes\SpringCloud\images\解决mybatis爆红.png)
+![image-20200429111044036](.\images\解决mybatis爆红.png)
 
-### 2.新建Module时maven界面对应的module为灰色
+## 2.新建Module时maven界面对应的module为灰色
 
 原因：父工程没有对其进行管理
 
@@ -531,7 +651,7 @@ public class OrderController {
 
 ------
 
-### 3.没有自动出现Run Dashboard
+## 3.没有自动出现Run Dashboard
 
 （Spring2019.3 的Run Dashboard改Services）
 
