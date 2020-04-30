@@ -77,7 +77,7 @@
 
 ![image-20200429093732866](D:\notes\SpringCloud\images\支付Module模块.png)
 
-**1.建module**
+###### 1.建module
 
 第一步：
 
@@ -97,23 +97,264 @@
 
 ------
 
-**2.改pom**
+###### 2.改pom
 
 ![image-20200429111848721](D:\notes\SpringCloud\images\支付module改pom.png)
 
+###### 3.写yml
+
+```java
+server:
+  port: 8001
 
 
+spring:
+  application:
+    name: cloud-payment-service
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    driver-class-name: org.gjt.mm.mysql.Driver
+    url: jdbc:mysql://localhost:3306/db2019?useUnicode=true&characterEnconding=utf-8&useSSL=false
+    username: root
+    password: 980219
 
 
+mybatis:
+  mapper-locations: classpath:mappper/*.xml
+  type-aliases-package: com.atguigu.springcloud.entities
+```
 
+###### 4.主启动
 
+```java
+package com.atguigu.springcloud;
 
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
 
+/**
+ * @author 郭泽鹏
+ * @create 2020/04/29 11:33
+ */
+@SpringBootApplication
+public class PaymentMain8001 {
+    public static void main(String[] args) {
+        SpringApplication.run(PaymentMain8001.class);
+    }
+}
+```
 
+###### 5.业务类
 
+1.建表SQL
 
+![image-20200430104114279](.\images\Payment Table.png)
 
+2.entities
 
+（1）主实体Payment
+
+```java
+package com.atguigu.springcloud.entities;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.io.Serializable;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+//序列化
+public class Payment implements Serializable {
+    private Long id;
+    private String serial;
+}
+```
+
+（2）Json封装体CommonResult
+
+```java
+package com.atguigu.springcloud.entities;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class CommonResult<T> {
+    private Integer code;
+    private String message;
+    private T data;
+
+    public CommonResult(Integer code, String message) {
+        this(code, message, null);
+    }
+}
+```
+
+3.dao
+
+Mapper接口：
+
+```java
+package com.atguigu.springcloud.dao;
+
+import com.atguigu.springcloud.entities.Payment;
+import org.apache.ibatis.annotations.Param;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface PaymentDao {
+    //增
+    public int create(Payment payment);
+
+    //查
+    public Payment getPaymentById(@Param("id") Long id);
+}
+```
+
+mapper配置文件：
+
+```java
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.atguigu.springcloud.dao.PaymentDao">
+    <insert id="create" parameterType="Payment" useGeneratedKeys="true" keyProperty="id">
+        insert into payment(serial) values(#{serial})
+    </insert>
+    <select id="getPaymentById" parameterType="Long" resultType="Payment">
+        select * from payment
+    </select>
+</mapper>
+```
+
+4.service
+
+service接口
+
+```java
+package com.atguigu.springcloud.service;
+
+import com.atguigu.springcloud.entities.Payment;
+import org.apache.ibatis.annotations.Param;
+
+public interface PaymentService {
+    //增
+    public int create(Payment payment);
+
+    //查
+    public Payment getPaymentById(Long id);
+}
+```
+
+service实现类
+
+```java
+package com.atguigu.springcloud.service.impl;
+
+import com.atguigu.springcloud.dao.PaymentDao;
+import com.atguigu.springcloud.entities.Payment;
+import com.atguigu.springcloud.service.PaymentService;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+
+@Service
+public class PaymentServiceImpl implements PaymentService {
+    @Resource
+    PaymentDao paymentDao;
+
+    @Override
+    public int create(Payment payment) {
+        return paymentDao.create(payment);
+    }
+
+    @Override
+    public Payment getPaymentById(Long id) {
+        return paymentDao.getPaymentById(id);
+    }
+}
+```
+
+5.controller
+
+```java
+package com.atguigu.springcloud.controller;
+
+import com.atguigu.springcloud.entities.CommonResult;
+import com.atguigu.springcloud.entities.Payment;
+import com.atguigu.springcloud.service.PaymentService;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.ibatis.annotations.Param;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import javax.annotation.Resource;
+
+@RestController
+//@Sl4j注解,可以使用log打印日志;
+@Slf4j
+public class PaymentController {
+
+    @Resource
+    PaymentService paymentService;
+    //增
+    @PostMapping(value = "/payment/create")
+    public CommonResult create(Payment payment){
+        int result = paymentService.create(payment);
+        log.info("****插入结果：" + result);
+        if(result > 0){
+            return new CommonResult(200, "插入数据库成功", result);
+        }else{
+            return new CommonResult(444, "插入数据库失败", null);
+        }
+    }
+
+    //查
+    @GetMapping(value = "/payment/get/{id}")
+    public CommonResult getPaymentById(@PathVariable("id") Long id){
+        Payment payment = paymentService.getPaymentById(id);
+        log.info("****查询结果：" + payment);
+        if(payment != null){
+            return new CommonResult(200, "查询成功", payment);
+        }else{
+            return new CommonResult(444, "没有对应记录，查询ID:" + id, null);
+        }
+    }
+}
+```
+
+##### 开启热部署
+
+第一步：
+
+![image-20200430132026491](.\images\开启热部署1.png)
+
+第二步：
+
+![image-20200430132107698](.\images\开启热部署2.png)
+
+第三步：
+
+![image-20200430132122756](.\images\开启热部署3.png)
+
+第四步：
+
+![image-20200430132138856](.\images\开启热部署4.png)
+
+##### 2.cloud-consumer-order80  消费者订单模块
+
+![image-20200430133742104](.\images\port80介绍.png)
+
+ 
 
 
 
