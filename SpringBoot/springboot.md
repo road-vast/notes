@@ -59,3 +59,18 @@
 第三步：
 
 ![image-20200430001222398](.\images\实现文件上传3.png)
+
+# 三、使用Lombok
+
+第一步：
+
+![image-20200430105230712](D:\notes\SpringBoot\images\使用Lombok1.png)
+
+第二步：
+
+![image-20200430105251924](D:\notes\SpringBoot\images\使用Lombok2.png)
+
+第三步：
+
+==引入Lombok依赖==
+
