@@ -567,6 +567,211 @@ public class EurekaMain7001 {
 
 访问7001端口-----》 [Eureka](http://localhost:7001/)
 
+------
+
+## （3）EurekaClient端cloud-provider-payment8001将注册进EurekarServer成为服务提供者provider，类似尚硅谷学校对外提供授课服务
+
+==步骤：==
+
+![image-20200502165553164](D:\notes\SpringCloud\images\注册8001-1.png)
+
+### 1.改POM
+
+![image-20200502170213896](.\images\EurekaClient版本比较.png)
+
+```java
+<!--eureka-client-->
+<dependency>
+	<groupId>org.springframework.cloud</groupId>
+	<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+</dependency>
+```
+
+### 2.写yml
+
+```java
+eureka:
+  client:
+    #表示是否将自己注册进EurekaServer默认为true。
+    register-with-eureka: true
+    #是否从EurekaServer抓取已有的注册信息，默认为true。单节点无所谓，集群必须设置为true才能配合ribbon使用负载均衡
+    fetchRegistry: true
+    service-url:
+      defaultZone: http://localhost:7001/eureka
+```
+
+### 3.主启动
+
+```java
+//主启动上添加注解
+@EnableEurekaClient
+```
+
+### 4.测试
+
+（1）先要启动Eureka Server
+
+（2）访问7001端口-----》 [Eureka](http://localhost:7001/)
+
+![image-20200502172102790](.\images\注册8001-2.png)
+
+（3）微服务注册名配置说明
+
+![image-20200502172453553](D:\notes\SpringCloud\images\注册8001-3.png)
+
+## （4）EurekaClient端cloud-consumer-order80将注册进EurekaServer成为服务消费者consumer，类似于来尚硅谷上课的各位同学
+
+![image-20200502172843303](.\images\注册80-1.png)
+
+### 1.改POM
+
+```java
+<!--eureka-client-->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+</dependency>
+```
+
+### 2.写yml
+
+```java
+spring:
+  application:
+    name: cloud-order-service
+
+eureka:
+  client:
+    #表示是否将自己注册进EurekaServer默认为true。
+    register-with-eureka: false
+    #是否从EurekaServer抓取已有的注册信息，默认为true。单节点无所谓，集群必须设置为true才能配合ribbon使用负载均衡
+    fetchRegistry: true
+    service-url:
+    defaultZone: http://localhost:7001/eureka
+```
+
+### 3.主启动
+
+```java
+//主启动上添加注解
+@EnableEurekaClient
+```
+
+### 4.测试
+
+![image-20200502174158395](.\images\注册80-2.png)
+
+------
+
+## (3)集群Eureka构建步骤
+
+### *原理
+
+![image-20200502174737853](D:\notes\SpringCloud\images\Eureka集群原理说明1.png)
+
+![image-20200502175042564](D:\notes\SpringCloud\images\Eureka集群原理说明2.png)
+
+![image-20200502175404532](D:\notes\SpringCloud\images\Eureka集群原理说明3.png)
+
+### 1.参考cloud-eureka-server7001新建module cloud-eureka-server7002
+
+### 2.改POM（参考7001）
+
+### 3.修改映射配置文件
+
+（作用：使两个服务注册中心的地址不会都是localhost）
+
+![image-20200502182425038](D:\notes\SpringCloud\images\Eureka集群1.png)
+
+~~~
+C:\Windows\System32\drivers\etc打开hosts文件尾部添加代码：
+127.0.0.1 eureka7001.com
+127.0.0.2 eureka7002.com
+*没有权限问题：右击hosts文件-》属性-》安全-》Users（当前用户）-》编辑-》Users-》勾选允许完全控制-》应用-》确定
+~~~
+
+### 4.写yml(同时修改7001和7002配置文件)
+
+7001：
+
+```java
+server:
+  port: 7001
+
+
+eureka:
+  instance:
+    hostname: eureka7001.com #eureka服务端的实例名称
+  client:
+    register-with-eureka: false     #false表示不向注册中心注册自己。
+    fetch-registry: false     #false表示自己端就是注册中心，我的职责就是维护服务实例，并不需要去检索服务
+    service-url:
+      #集群指向其它eureka，形成相互注册相互守望
+      defaultZone: http://eureka7002.com:7002/eureka/
+      #单机就是7001自己
+      #defaultZone: http://eureka7001.com:7001/eureka/
+```
+
+7002：
+
+```
+server:
+  port: 7002
+
+
+eureka:
+  instance:
+    hostname: eureka7002.com #eureka服务端的实例名称
+  client:
+    register-with-eureka: false     #false表示不向注册中心注册自己。
+    fetch-registry: false     #false表示自己端就是注册中心，我的职责就是维护服务实例，并不需要去检索服务
+    service-url:
+      #集群指向其它eureka，形成相互注册相互守望
+      defaultZone: http://eureka7001.com:7001/eureka/
+      #单机就是7001自己
+      #defaultZone: http://eureka7002.com:7002/eureka/
+```
+
+### 5.测试
+
+![image-20200502191741203](D:\notes\SpringCloud\images\Eureka集群.png)
+
+## （4）将支付服务8001和消费者订单80微服务发布到上面2台Eureka集群配置中
+
+### 1.改yml
+
+```java
+service-url:
+  #单机版
+  #defaultZone: http://localhost:7001/eureka
+  #集群版
+  defaultZone: http://eureka7001.com:7001/eureka,http://eureka7002.com:7002/eureka
+```
+
+### 2.测试：
+
+![image-20200502192730205](D:\notes\SpringCloud\images\Eureka集群测试.png)
+
+## （5）支付服务提供者8001集群环境构建
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
