@@ -754,27 +754,220 @@ service-url:
 
 ## （5）支付服务提供者8001集群环境构建
 
+### 1.参考8001新建8001Module
 
 
 
+### 2.改POM
 
 
 
+### 3.写yml
+
+```java
+server:
+  port: 8002
+
+
+spring:
+  application:
+    name: cloud-payment-service
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    driver-class-name: org.gjt.mm.mysql.Driver
+    url: jdbc:mysql://localhost:3306/db2019?useUnicode=true&characterEnconding=utf-8&useSSL=false
+    username: root
+    password: 980219
+
+eureka:
+  client:
+    #表示是否将自己注册进EurekaServer默认为true。
+    register-with-eureka: true
+    #是否从EurekaServer抓取已有的注册信息，默认为true。单节点无所谓，集群必须设置为true才能配合ribbon使用负载均衡
+    fetchRegistry: true
+    service-url:
+      #单机版
+      #defaultZone: http://localhost:7001/eureka
+      #集群版
+      defaultZone: http://eureka7001.com:7001/eureka,http://eureka7002.com:7002/eureka
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.atguigu.springcloud.entities
+```
+
+### 4.启动类
+
+```java
+package com.atguigu.springcloud;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.netflix.eureka.EnableEurekaClient;
+
+@SpringBootApplication
+@EnableEurekaClient
+@MapperScan("com.atguigu.springcloud.dao")
+public class Payment8002 {
+    public static void main(String[] args) {
+        SpringApplication.run(Payment8002.class);
+    }
+}
+```
+
+### 5.业务类
 
 
 
+### 6.修改8001/8002的Controller
 
+==（多加一个获取端口号的功能）==
 
+```java
+package com.atguigu.springcloud.controller;
 
+import com.atguigu.springcloud.entities.CommonResult;
+import com.atguigu.springcloud.entities.Payment;
+import com.atguigu.springcloud.service.PaymentService;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.bind.annotation.*;
 
+import javax.annotation.Resource;
 
+@RestController
+//@Sl4j注解,可以使用log打印日志;
+@Slf4j
+public class PaymentController {
 
+    @Resource
+    PaymentService paymentService;
+    //获取端口号
+    @Value("${server.port}")
+    private String serverPort;
 
+    //增
+    @PostMapping(value = "/payment/create")
+    public CommonResult create(@RequestBody Payment payment){
+        int result = paymentService.create(payment);
+        log.info("****插入结果：" + result);
+        if(result > 0){
+            return new CommonResult(200, "插入数据库成功" + serverPort, result);
+        }else{
+            return new CommonResult(444, "插入数据库失败" + serverPort, null);
+        }
+    }
 
+    //查
+    @GetMapping(value = "/payment/get/{id}")
+    public CommonResult getPaymentById(@PathVariable("id") Long id){
+        Payment payment = paymentService.getPaymentById(id);
+        log.info("****查询结果：" + payment + "哈哈哈");
+        if(payment != null){
+            return new CommonResult(200, "查询成功", payment);
+        }else{
+            return new CommonResult(444, "没有对应记录，查询ID:" + id, null);
+        }
+    }
+}
+```
 
+### 6.测试
 
+![image-20200503104749208](D:\notes\SpringCloud\images\Eureka8001实现集群.png)
 
+## （6）负载均衡
 
+### ==1.bug==
+
+订单访问地址不能写死，否则每次访问只会调用8001端口提供服务
+
+![image-20200503105520981](D:\notes\SpringCloud\images\Eureka负载均衡1.png)
+
+![image-20200503105615717](D:\notes\SpringCloud\images\Eureka负载均衡2.png)
+
+==*解决方案：==
+
+1.将"http://localhost:8001"改为注册进服务中心的名字"http://CLOUD-PAYMENT-SERVICE"
+
+2.使用@LoadBalanced注解赋予RestTemplate负载均衡的能力
+
+```java
+@Configuration
+public class ApplicationContextConfig {
+    @Bean
+    //使用@LoadBalanced注解赋予RestTemplate负载均衡的能力
+    @LoadBalanced
+    public RestTemplate getRestTemplate(){
+        return new RestTemplate();
+    }
+}
+```
+
+==成功实现负载均衡==
+
+## （7）actuator微服务信息完善
+
+### 1.主机名称：服务名称修改
+
+#### ==1）当前问题：（含有主机名称）==
+
+![image-20200503121705431](D:\notes\SpringCloud\images\actuator微服务信息完善1.png)
+
+#### 2）解决：
+
+修改cloud-provider-payment8001/8002 yml
+
+```
+eureka:
+  client:
+    #表示是否将自己注册进EurekaServer默认为true。
+    register-with-eureka: true
+    #是否从EurekaServer抓取已有的注册信息，默认为true。单节点无所谓，集群必须设置为true才能配合ribbon使用负载均衡
+    fetchRegistry: true
+    service-url:
+      #单机版
+      #defaultZone: http://localhost:7001/eureka
+      #集群版
+      defaultZone: http://eureka7001.com:7001/eureka,http://eureka7002.com:7002/eureka
+  instance:
+    instance-id: payment8001	#不显示主机名称
+```
+
+效果：
+
+![image-20200503122823154](D:\notes\SpringCloud\images\actuator微服务信息完善3.png)
+
+### 2.访问信息有IP信息提示
+
+当前问题：（没有IP地址提示）
+
+![image-20200503122101186](D:\notes\SpringCloud\images\actuator微服务信息完善2.png)
+
+#### 2）解决：
+
+修改cloud-provider-payment8001/8002 yml
+
+```java
+eureka:
+  client:
+    #表示是否将自己注册进EurekaServer默认为true。
+    register-with-eureka: true
+    #是否从EurekaServer抓取已有的注册信息，默认为true。单节点无所谓，集群必须设置为true才能配合ribbon使用负载均衡
+    fetchRegistry: true
+    service-url:
+      #单机版
+      #defaultZone: http://localhost:7001/eureka
+      #集群版
+      defaultZone: http://eureka7001.com:7001/eureka,http://eureka7002.com:7002/eureka
+  instance:
+    instance-id: payment8002  #不显示主机名称
+    prefer-ip-address: true   #访问路径可以显示ip地址
+```
+
+效果：
+
+![image-20200503123214486](D:\notes\SpringCloud\images\actuator微服务信息完善4.png)
 
 
 
