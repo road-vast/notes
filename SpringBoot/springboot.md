@@ -250,3 +250,8 @@ public class SwaggerConfig {
     }
 }
 ```
+
+访问：---》》》[Swagger-ui](http://localhost:8080/swagger-ui.html#/)
+
+------
+
