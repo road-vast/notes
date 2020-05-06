@@ -969,6 +969,936 @@ eureka:
 
 ![image-20200503123214486](D:\notes\SpringCloud\images\actuator微服务信息完善4.png)
 
+## （8）服务发现 Discovery
+
+==*效果==
+
+对于注册进eureka里面的微服务，可以通过服务发现来获得该服务的信息
+
+### 1.修改cloud-provider-payment8001的Controller
+
+~~~java
+	//自动注入DiscoveryClient属性：服务发现
+	@Resource
+    private DiscoveryClient discoveryClient;
+	//
+	@GetMapping("/payment/discovery")
+    public Object discovery(){
+        //获取注入到服务中心的服务列表信息
+        List<String> services = discoveryClient.getServices();
+        for (String element:
+             services) {
+            log.info("*******element" + element);
+        }
+        //获取其中的一个服务名的具体信息
+        List<ServiceInstance> instances = discoveryClient.getInstances("CLOUD-PAYMENT-SERVICE");
+        for (ServiceInstance instance:
+             instances) {
+            log.info(instance.getServiceId() + "\t" + instance.getHost() + "\t"
+            + instance.getPort() + "\t" + instance.getUri());
+        }
+        return this.discoveryClient;
+    }
+~~~
+
+### 2.8001主启动类
+
+```java
+//添加开启服务发现注解
+@EnableDiscoveryClient
+```
+
+### 3.自测
+
+访问-》》》》    [8001-Discovery](http://localhost:8001/payment/discovery)
+
+![image-20200504095930986](D:\notes\SpringCloud\images\Discovery1.png)
+
+![image-20200504095634924](D:\notes\SpringCloud\images\Discovery2.png)
+
+------
+
+## （9）Eureka自我保护
+
+### 1.故障现象：
+
+![image-20200504100540365](D:\notes\SpringCloud\images\Eureka自我保护1.png)
+
+### 2.导致原因：
+
+![image-20200504100621281](D:\notes\SpringCloud\images\Eureka自我保护2.png)
+
+### 3.怎么禁止自我保护：
+
+==这里设置为eurekau为单机版==
+
+#### （1）注册端EurekaServer端7001
+
+##### 1）出厂默认，自我保护机制使开启的server.enable-self-preservation=true
+
+##### 2）使用server.enable-self-preservation=false关闭自我保护机制
+
+##### 3）在EurekaServer端7001处设置关闭自我保护机制
+
+```java
+eureka:
+  instance:
+    hostname: eureka7001.com #eureka服务端的实例名称
+  client:
+    register-with-eureka: false     #false表示不向注册中心注册自己。
+    fetch-registry: false     #false表示自己端就是注册中心，我的职责就是维护服务实例，并不需要去检索服务
+    service-url:
+      #集群版：集群指向其它eureka，形成相互注册相互守望
+      #defaultZone: http://eureka7002.com:7002/eureka/
+      #单机版：单机就是7001自己
+      defaultZone: http://eureka7001.com:7001/eureka/
+  server:
+    #关闭自我保护机制，保证不可用服务被机制剔除
+    enable-self-preservation: false
+    #设置多久没收到心跳则关闭服务:2s
+    eviction-interval-timer-in-ms: 2000
+```
+
+##### 4）关闭效果
+
+![image-20200504103257734](D:\notes\SpringCloud\images\禁止自我保护1.png)
+
+##### 
+
+#### （2）生产客户端eurekaClient端8001
+
+##### 1）设置客户端发送心跳的时间和服务端等待心跳时间上限
+
+```java
+eureka:
+  client:
+    #表示是否将自己注册进EurekaServer默认为true。
+    register-with-eureka: true
+    #是否从EurekaServer抓取已有的注册信息，默认为true。单节点无所谓，集群必须设置为true才能配合ribbon使用负载均衡
+    fetchRegistry: true
+    service-url:
+      #单机版
+      defaultZone: http://localhost:7001/eureka
+      #集群版
+      #defaultZone: http://eureka7001.com:7001/eureka,http://eureka7002.com:7002/eureka
+  instance:
+    instance-id: payment8001  #不显示主机名称
+    prefer-ip-address: true   #访问路径可以显示ip地址
+    #Eureka客户端向服务端发送心跳的时间间隔，单位为秒（默认使30秒）
+    lease-renewal-interval-in-seconds: 1
+    #Eureka服务端在收到最后一次心跳后等待时间上限，单位为秒（默认使90秒），超时将剔除服务
+    lease-expiration-duration-in-seconds: 2
+```
+
+##### 2）效果
+
+8001服务一关闭后，eureka则剔除8001服务
+
+![image-20200504104349504](D:\notes\SpringCloud\images\Eureka自我保护3.png)
+
+------
+
+# 4.ZooKeeper的注册与调用
+
+## ==（1）Eureka已停止更新==
+
+## （2）SpringCloud整合Zookeeper代替Eureka
+
+![image-20200504105135864](D:\notes\SpringCloud\images\zookeeper实现效果.png)
+
+### 1）注册中心Zookeeper
+
+- Zookeeper是一个分布式协调工具，可以实现注册中心功能；
+- 关闭Linux服务器防火墙之后启动zookeeper服务器
+- zookerper服务器代替Eureka服务器，zk作为服务注册中心
+
+==使用docker下载zookeeper，必须保证虚拟机ping通主机==
+
+### 2）服务提供者
+
+#### 1.新建cloud-provider-payment8004
+
+
+
+#### 2.改POM
+
+~~~java
+	<dependencies>
+        <!-- SpringBoot整合Web组件 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency><!-- 引入自己定义的api通用包，可以使用Payment支付Entity -->
+            <groupId>com.atguigu.springcloud</groupId>
+            <artifactId>cloud-api-commons</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- SpringBoot整合zookeeper客户端 -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-zookeeper-discovery</artifactId>
+            <!--先排除自带的zookeeper3.5.3-->
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.zookeeper</groupId>
+                    <artifactId>zookeeper</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!--添加zookeeper3.4.9版本-->
+        <dependency>
+            <groupId>org.apache.zookeeper</groupId>
+            <artifactId>zookeeper</artifactId>
+            <version>3.4.9</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+~~~
+
+#### 3.写yml
+
+```java
+#8004表示注册到zookeeper服务器的支付服务提供者端口号
+server:
+  port: 8004
+
+
+#服务别名----注册zookeeper到注册中心名称
+spring:
+  application:
+    name: cloud-provider-payment
+  cloud:
+    zookeeper:
+      connect-string: 192.168.0.109:2181
+```
+
+#### 4.主启动
+
+```java
+package com.atguigu.cloud;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
+
+@SpringBootApplication
+@EnableDiscoveryClient  //该注解用于向使用consul或者zookeeper作为注册中心时注册服务
+public class PaymentMain8004 {
+    public static void main(String[] args) {
+        SpringApplication.run(PaymentMain8004.class, args);
+    }
+}
+```
+
+#### 5.Controller
+
+```java
+package com.atguigu.cloud.controller;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.UUID;
+
+@RestController
+@Slf4j
+public class PaymentController {
+    @Value("${server.port}")
+    private String serverPort;
+
+    @RequestMapping(value = "/payment/zk")
+    public String paymentzk()
+    {
+        return "springcloud with zookeeper: "+serverPort+"\t"+ UUID.randomUUID().toString();
+    }
+}
+```
+
+#### 6.启动8004注册进Zookeeper
+
+#### （1）linux下启动zookerper
+
+~~~
+1.进入容器内部：
+docker exec -it containerID bash
+2.开启客户端：
+zkCli.sh
+4.获取节点：
+ls /
+显示：[zookeeper]
+~~~
+
+#### （2）开启8004主启动
+
+==（注意Zookerper引入的jar包和linux里的Zookeeper版本要一致，否则可能报错）==
+
+1）启动没有报错后，在容器内部输入  ls /  出现如下界面，表示注册进Zookeeper成功。
+
+![image-20200505101817207](D:\notes\docker\images\zookeeper2.png)
+
+​																			【启动成功】
+
+访问：---》》》	[PaymentController](http://localhost:8004/payment/zk)
+
+![image-20200505102644756](D:\notes\docker\images\zookeeper3.png)
+
+------
+
+#### 7.测试验证
+
+在linux中查看节点信息（表示微服务8004在Zookeeper下的基本信息）
+
+![image-20200505103942827](D:\notes\docker\images\zookeeper4.png)
+
+使用：---》》》[json工具](https://tool.lu/json/) 	转化后：
+
+~~~java
+{
+  "name": "cloud-provider-payment",
+  "id": "98b8b838-7529-49ba-b505-fd8c7b0d1914",			//自动生成services id的流水号
+  "address": "localhost",
+  "port": 8004,
+  "sslPort": null,
+  "payload": {
+    "@class": "org.springframework.cloud.zookeeper.discovery.ZookeeperInstance",
+    "id": "application-1",
+    "name": "cloud-provider-payment",
+    "metadata": {}
+  },
+  "registrationTimeUTC": 1588645876105,
+  "serviceType": "DYNAMIC",
+  "uriSpec": {
+    "parts": [
+      {
+        "value": "scheme",
+        "variable": true
+      },
+      {
+        "value": "://",
+        "variable": false
+      },
+      {
+        "value": "address",
+        "variable": true
+      },
+      {
+        "value": ":",
+        "variable": false
+      },
+      {
+        "value": "port",
+        "variable": true
+      }
+    ]
+  }
+}
+~~~
+
+#### 8.思考
+
+服务节点是临时结点还是持久结点？		临时节点（一段时间发心跳没有回复则直接剔除）
+
+------
+
+## 3）服务消费者
+
+### 1.新建cloud-consumerzk-order80
+
+
+
+### 2.改POM
+
+```java
+<dependencies>
+    <!-- SpringBoot整合Web组件 -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <!-- SpringBoot整合zookeeper客户端 -->
+    <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-starter-zookeeper-discovery</artifactId>
+        <!--先排除自带的zookeeper-->
+        <exclusions>
+            <exclusion>
+                <groupId>org.apache.zookeeper</groupId>
+                <artifactId>zookeeper</artifactId>
+            </exclusion>
+        </exclusions>
+    </dependency>
+    <!--添加zookeeper3.4.9版本-->
+    <dependency>
+        <groupId>org.apache.zookeeper</groupId>
+        <artifactId>zookeeper</artifactId>
+        <version>3.4.9</version>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-devtools</artifactId>
+        <scope>runtime</scope>
+        <optional>true</optional>
+    </dependency>
+    <dependency>
+        <groupId>org.projectlombok</groupId>
+        <artifactId>lombok</artifactId>
+        <optional>true</optional>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-test</artifactId>
+        <scope>test</scope>
+    </dependency>
+</dependencies>
+```
+
+### 3.写yml
+
+```java
+server:
+  port: 80
+
+spring:
+  application:
+    name: cloud-consumer-order
+  cloud:
+    #注册到zookeeper地址
+    zookeeper:
+      connect-string: 192.168.0.109:2181
+```
+
+### 4.主启动
+
+```java
+package com.atguigu.springcloud;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
+
+@SpringBootApplication
+@EnableDiscoveryClient
+public class OrderZKMain80 {
+    public static void main(String[] args) {
+        SpringApplication.run(OrderZKMain80.class, args);
+    }
+}
+```
+
+### 5.业务类
+
+配置类
+
+```java
+package com.atguigu.springcloud.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestTemplate;
+
+@Configuration
+public class RestTemplateConfig {
+    @Bean
+    @LoadBalanced
+    public RestTemplate getRestTemplate(){
+        return new RestTemplate();
+    }
+}
+```
+
+Controller类
+
+```java
+package com.atguigu.springcloud.controller;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+
+import javax.annotation.Resource;
+
+@RestController
+@Slf4j
+public class OrderZKController {
+    private static final String INVOKE_URL = "http://cloud-provider-payment";
+    @Resource
+    private RestTemplate restTemplate;
+
+    public String paymentInfo(){
+        String result = restTemplate.getForObject(INVOKE_URL + "payment/zk", String.class);
+        return result;
+    }
+}
+```
+
+### 6.测试验证
+
+![image-20200505113528012](D:\notes\docker\images\zookeeper5.png)
+
+### 7.访问测试地址
+
+访问：---》》》	[orderZK80](http://localhost/consumer/payment/zk)
+
+![image-20200505113626730](D:\notes\docker\images\zookeeper6.png)
+
+------
+
+# 5.Consul服务注册与发现
+
+## （1）Consul简介
+
+[Consul官网](https://www.consul.io/intro/index.html)
+
+[Consul中文官网](https://www.springcloud.cc/spring-cloud-consul.html)
+
+![image-20200505122617997](D:\notes\SpringCloud\images\consul简介1.png)
+
+![image-20200505122658566](D:\notes\SpringCloud\images\consul简介2.png)
+
+
+
+## （2）安装与运行Consul
+
+下载：---》》》	[官网下载](https://www.consul.io/downloads.html)
+
+运行：cmd定位到安装目录下
+
+查看版本：consul --version
+
+运行：consul agent -dev
+
+访问：---》》》		[Consul8500](http://localhost:8500/ui/dc1/services)
+
+![image-20200506094159290](D:\notes\SpringCloud\images\consul安装与运行1.png)
+
+## （3）服务提供者
+
+### 1.新建Module支付服务cloud-providerconsul-payment8006
+
+
+
+### 2.改POM
+
+```java
+<dependencies>
+    <!-- 引入自己定义的api通用包，可以使用Payment支付Entity -->
+    <dependency>
+        <groupId>com.atguigu.springcloud</groupId>
+        <artifactId>cloud-api-commons</artifactId>
+        <version>${project.version}</version>
+    </dependency>
+    <!--SpringCloud consul-server -->
+    <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-starter-consul-discovery</artifactId>
+    </dependency>
+    <!-- SpringBoot整合Web组件 -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+    <!--日常通用jar包配置-->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-devtools</artifactId>
+        <scope>runtime</scope>
+        <optional>true</optional>
+    </dependency>
+    <dependency>
+        <groupId>org.projectlombok</groupId>
+        <artifactId>lombok</artifactId>
+        <optional>true</optional>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-test</artifactId>
+        <scope>test</scope>
+    </dependency>
+    <dependency>
+        <groupId>cn.hutool</groupId>
+        <artifactId>hutool-all</artifactId>
+        <version>RELEASE</version>
+        <scope>test</scope>
+    </dependency>
+    <dependency>
+        <groupId>cn.hutool</groupId>
+        <artifactId>hutool-all</artifactId>
+        <version>RELEASE</version>
+        <scope>test</scope>
+    </dependency>
+</dependencies>
+```
+
+### 3.写yml
+
+```java
+###consul服务端口号
+server:
+  port: 8006
+
+spring:
+  application:
+    name: consul-provider-payment
+  ####consul注册中心地址
+  cloud:
+    consul:
+      host: localhost
+      port: 8500
+      discovery:
+        #hostname: 127.0.0.1
+        service-name: ${spring.application.name}
+```
+
+### 4.主启动
+
+```java
+package com.atguigu.springcloud;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
+
+@SpringBootApplication
+@EnableDiscoveryClient
+public class PaymentMain8006 {
+    public static void main(String[] args) {
+        SpringApplication.run(PaymentMain8006.class, args);
+    }
+}
+```
+
+### 5.业务类Controller
+
+```
+package com.atguigu.springcloud.controller;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.UUID;
+
+@RestController
+public class PaymentController {
+    @Value("${server.port}")
+    private String serverPort;
+
+    @RequestMapping(value = "/payment/consul")
+    public String paymentConsul(){
+        return "springCloud with Consul\t" + serverPort + "\t" + UUID.randomUUID().toString();
+    }
+}
+```
+
+### 6.验证测试
+
+![image-20200506103630739](D:\notes\SpringCloud\images\Consul服务提供者1.png)
+
+访问：---》》》	[ConsulController8006](http://localhost:8006/payment/consul)
+
+![image-20200506103808234](D:\notes\SpringCloud\images\Consul服务提供者2.png)
+
+## （4）服务消费者
+
+### 1.新建Module消费服务cloud-consumerconsul-order80
+
+
+
+### 2.改POM
+
+~~~java
+<dependencies>
+        <!--SpringCloud consul-server -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-consul-discovery</artifactId>
+        </dependency>
+        <!-- SpringBoot整合Web组件 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <!--日常通用jar包配置-->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+~~~
+
+
+
+### 3.写yml
+
+~~~java
+###consul服务端口号
+server:
+  port: 80
+
+spring:
+  application:
+    name: cloud-consumer-order
+####consul注册中心地址
+  cloud:
+    consul:
+      host: localhost
+      port: 8500
+      discovery:
+        #hostname: 127.0.0.1
+        service-name: ${spring.application.name}
+
+
+~~~
+
+
+
+### 4.主启动
+
+```
+package com.atguigu.springcloud;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
+
+@SpringBootApplication
+@EnableDiscoveryClient
+public class OrderConsulMain80 {
+    public static void main(String[] args) {
+        SpringApplication.run(OrderConsulMain80.class, args);
+    }
+}
+```
+
+### 5.业务类
+
+配置类
+
+```java
+package com.atguigu.springcloud.config;
+
+import org.springframework.cloud.client.loadbalancer.LoadBalanced;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestTemplate;
+
+@Configuration
+public class RestTemplateConfig {
+    @Bean
+    @LoadBalanced
+    public RestTemplate getRestTemplate(){
+        return new RestTemplate();
+    }
+}
+```
+
+Controller类
+
+```java
+package com.atguigu.springcloud.controller;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+
+import javax.annotation.Resource;
+
+@RestController
+public class OrderController {
+    private static final String INVOKE_URL = "http://consul-provider-payment";
+    @Resource
+    private RestTemplate restTemplate;
+    @GetMapping("/consumer/payment/consul")
+    public String paymentInfo(){
+        String result = restTemplate.getForObject(INVOKE_URL + "/payment/consul", String.class);
+        return result;
+    }
+
+}
+```
+
+### 6.验证测试
+
+![image-20200506110401877](D:\notes\SpringCloud\images\Consul服务消费者1.png)
+
+访问：---》》》		[Consul消费者](http://localhost/consumer/payment/consul)
+
+![image-20200506110537951](D:\notes\SpringCloud\images\Consul服务消费者2.png)
+
+## （5）三个注册中心异同点
+
+1.
+
+![image-20200506111704156](D:\notes\SpringCloud\images\三个注册中心异同点1.png)
+
+2.![image-20200506111739249](D:\notes\SpringCloud\images\三个注册中心异同点2.png)
+
+3.
+
+![image-20200506111815585](D:\notes\SpringCloud\images\三个注册中心异同点3.png)
+
+
+
+4.
+
+![image-20200506111920977](D:\notes\SpringCloud\images\三个注册中心异同点5.png)
+
+5.
+
+![image-20200506111855764](D:\notes\SpringCloud\images\三个注册中心异同点4.png)
+
+![image-20200506111949401](D:\notes\SpringCloud\images\三个注册中心异同点6.png)
+
+6.
+
+![image-20200506112015059](D:\notes\SpringCloud\images\三个注册中心异同点7.png)
+
+![image-20200506112031377](D:\notes\SpringCloud\images\三个注册中心异同点8.png)
+
+# 6.Ribbon负载均衡服务调用
+
+## （1）概述
+
+#### 1.Ribbon是什么？
+
+![image-20200506121601482](D:\notes\SpringCloud\images\Ribbon概述1.png)
+
+#### 2.Ribbon下载
+
+目前正在维护中...
+
+[Ribbon官网](https://github.com/Netflix/ribbon)
+
+#### 3.能做什么？
+
+==负载均衡+RestTemplate调用==
+
+1）LB（负载均衡）
+
+![image-20200506124617891](D:\notes\SpringCloud\images\Ribbon概述2.png)
+
+（1）集中式LB
+
+![image-20200506124847553](D:\notes\SpringCloud\images\Ribbon概述3.png)
+
+（2）进程内LB
+
+![image-20200506124911282](D:\notes\SpringCloud\images\Ribbon概述4.png)
+
+
+
+## （2）Ribbon负载均衡演示
+
+![image-20200506125145409](D:\notes\SpringCloud\images\Ribbon负载均衡演示1.png)
+
+------
+
+### 1.架构图
+
+![image-20200506125339842](D:\notes\SpringCloud\images\Ribbon负载均衡演示2.png)
+
+![image-20200506125515828](D:\notes\SpringCloud\images\Ribbon负载均衡演示3.png)
+
+### ==2.Eureka依赖中已经引入了Ribbon依赖==
+
+![image-20200506133347530](D:\notes\SpringCloud\images\Ribbon负载均衡演示4.png)
+
+### 3.二说RestTemplate的使用
+
+#### 1）getForObject方法/getForEntity方法
+
+```java
+//返回对象是响应体中数据转化成的对象，基本上可以理解为Json
+@GetMapping("/consumer/payment/get/{id}")
+public CommonResult getPayment(@PathVariable("id") Long id){
+    return restTemplate.getForObject(PAYMENT_URL + "/payment/get/" + id, CommonResult.class);
+}
+//返回对象为ResponseEntity对象，包含了响应中的一些重要信息，比如响应头，响应状态码，响应体等
+@GetMapping("/consumer/payment/getForEntity/{id}")
+public CommonResult getPayment2(@PathVariable("id") Long id){
+    ResponseEntity<CommonResult> entity = restTemplate.getForEntity(PAYMENT_URL + "/payment/get/" + id, CommonResult.class);
+
+    if (entity.getStatusCode().is2xxSuccessful()){
+        log.info("********************" + String.valueOf(entity.getHeaders()) + "\t" +  entity.getStatusCode());
+        return entity.getBody();
+    }else{
+        return new CommonResult(400, "操作失败");
+    }
+}
+```
+
+#### 2）postForObject方法/postForEntity方法
+
+```java
+@PostMapping("/consumer/payment/create")
+public CommonResult create(Payment payment){
+    return restTemplate.postForObject(PAYMENT_URL + "/payment/create", payment, CommonResult.class);
+}
+@PostMapping("/consumer/payment/createEntity")
+public CommonResult create1(Payment payment){
+    ResponseEntity<CommonResult> entity = restTemplate.postForEntity(PAYMENT_URL + "/payment/create", payment, CommonResult.class);
+    if (entity.getStatusCode().is2xxSuccessful()){
+        return entity.getBody();
+    }else{
+        return new CommonResult<>(400, "插入失败");
+    }
+}
+```
+
+## （3）Ribbon核心组件IRule
+
+### 1IRule：根据特定算法从服务列表中选取一个要访问的服务
+
+![image-20200507000040852](D:\notes\SpringCloud\images\Ribbon核心组件IRule1.png)
+
+## （4）Ribbon负载均衡算法
+
+
+
+
+
+
+
+
+
 
 
 
