@@ -1885,9 +1885,79 @@ public CommonResult create1(Payment payment){
 
 ## （3）Ribbon核心组件IRule
 
-### 1IRule：根据特定算法从服务列表中选取一个要访问的服务
+### 1.IRule：根据特定算法从服务列表中选取一个要访问的服务
 
 ![image-20200507000040852](D:\notes\SpringCloud\images\Ribbon核心组件IRule1.png)
+
+### 2.怎么替换算法？
+
+### 1）修改cloud-consumer-order80
+
+
+
+
+
+
+
+### 2）注意配置细节
+
+![image-20200507094623277](D:\notes\SpringCloud\images\Ribbon怎么替换算法1.png)
+
+==也就是不能放在@SpringBootApplication这个配置所对应的包及子包下。==
+
+![image-20200507094925416](D:\notes\SpringCloud\images\Ribbon怎么替换算法2.png)
+
+------
+
+### 3）新建package	com.atguigu.rule
+
+![image-20200507095343458](D:\notes\SpringCloud\images\Ribbon怎么替换算法3.png)
+
+------
+
+### 4）上面包上新建MySelfRule规则类
+
+```
+package com.atguigu.rule;
+
+import com.netflix.loadbalancer.IRule;
+import com.netflix.loadbalancer.RandomRule;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class MySelfRule {
+    @Bean
+    public IRule myRule(){
+    	//随机算法
+        return new RandomRule();
+    }
+}
+```
+
+### 5）主启动类添加@RibbonClient
+
+```java
+package com.atguigu.springcloud;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.netflix.eureka.EnableEurekaClient;
+import org.springframework.cloud.netflix.ribbon.RibbonClient;
+
+@SpringBootApplication
+@EnableEurekaClient
+@RibbonClient
+public class OrderMain80 {
+    public static void main(String[] args) {
+        SpringApplication.run(OrderMain80.class);
+    }
+}
+```
+
+### 6）测试
+
+8001/8002端口随机使用：---》》》		[测试随机算法](http://localhost/consumer/payment/get/31)
 
 ## （4）Ribbon负载均衡算法
 
@@ -1895,7 +1965,295 @@ public CommonResult create1(Payment payment){
 
 
 
+# 7.OpenFeign服务接口调用
 
+## （1）概述
+
+### 1）OpenFeign是什么？
+
+![image-20200507105010127](D:\notes\SpringCloud\images\OpenFeign概述1.png)
+
+![image-20200507105040225](D:\notes\SpringCloud\images\OpenFeign概述2.png)
+
+### 2）OpenFeign能干嘛？
+
+![image-20200507105057495](D:\notes\SpringCloud\images\OpenFeign能干嘛1.png)
+
+### 3）Feign和OpenFeign两者的区别：
+
+![image-20200507105145494](D:\notes\SpringCloud\images\Feign和OpenFeign的区别.png)
+
+## （2）OpenFeign使用步骤
+
+### 1）接口加注解
+
+微服务调用接口+@FeignClient
+
+### 2）新建cloud-consumer-feign-order80
+
+Feingn在消费端使用
+
+### 3）改POM
+
+```java
+<dependencies>
+    <!--openfeign-->
+    <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-starter-openfeign</artifactId>
+    </dependency>
+    <!--eureka client-->
+    <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+    </dependency>
+    <!-- 引入自己定义的api通用包，可以使用Payment支付Entity -->
+    <dependency>
+        <groupId>com.atguigu.springcloud</groupId>
+        <artifactId>cloud-api-commons</artifactId>
+        <version>${project.version}</version>
+    </dependency>
+    <!--web-->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+    <!--一般基础通用配置-->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-devtools</artifactId>
+        <scope>runtime</scope>
+        <optional>true</optional>
+    </dependency>
+    <dependency>
+        <groupId>org.projectlombok</groupId>
+        <artifactId>lombok</artifactId>
+        <optional>true</optional>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-test</artifactId>
+        <scope>test</scope>
+    </dependency>
+</dependencies>
+```
+
+### 4）写yml
+
+```java
+server:
+  port: 80
+
+eureka:
+  client:
+    register-with-eureka: false
+    service-url:
+      defaultZone: http://eureka7001.com:7001/eureka/,http://eureka7002.com:7002/eureka/
+```
+
+### 5）主启动
+
+```java
+package com.atguigu.springcloud;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
+import org.springframework.cloud.openfeign.EnableFeignClients;
+
+@SpringBootApplication
+@EnableFeignClients
+public class OrderFeignMain80 {
+    public static void main(String[] args) {
+        SpringApplication.run(OrderFeignMain80.class, args);
+    }
+}
+```
+
+### 6）业务类
+
+1.业务逻辑接口+@FeignClient配置调用Provider服务
+
+2.新建PaymentFeignService接口并新增注解@FeignClient
+
+```java
+package com.atguigu.springcloud.service;
+
+import com.atguigu.springcloud.entities.CommonResult;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.stereotype.Component;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+
+@Component
+@FeignClient(value = "CLOUD-PAYMENT-SERVICE")
+public interface PaymentFeignService {
+    @GetMapping(value = "/payment/get/{id}")
+    public CommonResult getPaymentById(@PathVariable("id") Long id);
+}
+```
+
+3.控制层Controller
+
+```java
+package com.atguigu.springcloud.controller;
+
+import com.atguigu.springcloud.entities.CommonResult;
+import com.atguigu.springcloud.entities.Payment;
+import com.atguigu.springcloud.service.PaymentFeignService;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RestController;
+
+import javax.annotation.Resource;
+
+@RestController
+public class OrderFeignController {
+
+    @Resource
+    PaymentFeignService paymentFeignService;
+
+    @GetMapping("/consumer/paymentFeign/get/{id}")
+    public CommonResult<Payment> getPaymentById(@PathVariable("id") Long id){
+        return paymentFeignService.getPaymentById(id);
+    }
+}
+```
+
+### 7）测试
+
+访问：---》》》		[OrderFeign](http://localhost/consumer/paymentFeign/get/31)			Feign自带负载均衡配置项
+
+### 8）小总结
+
+![image-20200507131047340](D:\notes\SpringCloud\images\OpenFeign小总结1.png)
+
+## （3）OpenFeign超时控制
+
+### 1）超时设置，故意设置超时演示出错情况
+
+1.8001的Controller:
+
+```java
+@GetMapping("/payment/feign/timeout")
+public String paymentFeignTimeout(){
+    try {
+        TimeUnit.SECONDS.sleep(3);
+    } catch (InterruptedException e) {
+        e.printStackTrace();
+    }
+    return serverPort;
+}
+```
+
+2.orderFeignService:
+
+```java
+//演示超时错误
+@GetMapping("/payment/feign/timeout")
+public String paymentFeignTimeout();
+```
+
+3.orderFeignController
+
+```
+//演示超时错误
+@GetMapping("/consumer/payment/feign/timeout")
+public String paymentFeignTimeout(){
+    //openfeign-ribbon,客户端一般默认等待一秒钟
+    return paymentFeignService.paymentFeignTimeout();
+}
+```
+
+### 2）OpenFein默认等待一秒钟，超过后报错
+
+![image-20200507172740763](D:\notes\SpringCloud\images\OpenFeign超时控制.png)
+
+### 3）是什么
+
+![image-20200507172417499](D:\notes\SpringCloud\images\OpenFeign超时控制1.png)
+
+
+
+### 4）yml文件里需要开启OpenFein客户端超时控制
+
+==超时控制由ribbon进行控制==
+
+```java
+#设置feign客户端超时时间(OpenFeign默认支持ribbon)
+ribbon:
+  #指的是建立连接所用的时间，适用于网络状况正常的情况下,两端连接所用的时间
+  ConnectTimeout: 5000
+  #指的是建立连接后从服务器读取到可用资源所用的时间
+  ReadTimeout: 5000
+```
+
+## （4）OpenFeign日志打印功能
+
+### 1）日志打印功能
+
+
+
+### 2）是什么？
+
+![image-20200507174731756](D:\notes\SpringCloud\images\OpenFeign打印功能1.png)
+
+### 3）日志级别
+
+![image-20200507174807427](D:\notes\SpringCloud\images\OpenFeign日志打印功能2.png)
+
+### 4）配置日志bean
+
+```java
+package com.atguigu.springcloud.config;
+
+import feign.Logger;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class FeignConfig {
+    @Bean
+    Logger.Level feignLoggerLevel(){
+        return Logger.Level.FULL;
+    }
+}
+```
+
+### 5）YML文件里需要开启日志的Feign客户端
+
+```java
+server:
+  port: 80
+
+eureka:
+  client:
+    register-with-eureka: false
+    service-url:
+      defaultZone: http://eureka7001.com:7001/eureka/,http://eureka7002.com:7002/eureka/
+
+#设置feign客户端超时时间(OpenFeign默认支持ribbon)
+ribbon:
+  #指的是建立连接所用的时间，适用于网络状况正常的情况下,两端连接所用的时间
+  ConnectTimeout: 5000
+  #指的是建立连接后从服务器读取到可用资源所用的时间
+  ReadTimeout: 5000
+
+logging:
+  level:
+    # feign日志以什么级别监控哪个接口
+    com.atguigu.springcloud.service.PaymentFeignService: debug
+```
+
+### 6）后台日志查看
+
+访问：---》》》		[OpenFeignConsumer](http://localhost/consumer/paymentFeign/get/31)
+
+![image-20200508181036299](D:\notes\SpringCloud\images\OpenFeign日志打印功能3.png)
 
 
 
