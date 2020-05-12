@@ -2255,7 +2255,243 @@ logging:
 
 ![image-20200508181036299](D:\notes\SpringCloud\images\OpenFeign日志打印功能3.png)
 
+# 8.Hystrix断路器
 
+## （1）概述
+
+### 1）分布式系统面临的问题
+
+![image-20200512174514457](D:\notes\SpringCloud\images\hystrix概述1.png)
+
+### 2）是什么？
+
+![image-20200512174629207](D:\notes\SpringCloud\images\hystrix概述2.png)
+
+### 3）能干嘛？
+
+1.服务降级
+
+2.服务熔断
+
+3.接近实时的监控
+
+### 4）官网资料
+
+[hystrix官网](https://github.com/Netflix/Hystrix/wiki/How-To-Use)
+
+### 5）Hystrix官宣，停更进维
+
+## （2）Hystrix重要概念
+
+#### 1.服务降级fallback
+
+概念：服务器忙，请稍后再试，不让客户端等待并立刻返回一个友好提示
+
+哪些情况会出现降级？
+
+（1）程序运行异常；
+
+（2）超时；
+
+（3）服务熔断触发服务降级；
+
+（4）线程池/信号量打满也会导致服务降级；
+
+#### 2.服务熔断break
+
+![image-20200512184923351](.\images\hystrix重要概念2.png)
+
+#### 3.服务限流flowlimit
+
+![image-20200512184500079](D:\notes\SpringCloud\images\hystrix重要概念3.png)
+
+## （3）hystrix案例
+
+#### 1.构建
+
+##### （1）新建cloud-provider-hystrix-payment8001
+
+
+
+##### （2）改POM
+
+```java
+<dependencies>
+    <!--hystrix-->
+    <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-starter-netflix-hystrix</artifactId>
+    </dependency>
+    <!--eureka client-->
+    <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+    </dependency>
+    <!--web-->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+    <dependency><!-- 引入自己定义的api通用包，可以使用Payment支付Entity -->
+        <groupId>com.atguigu.springcloud</groupId>
+        <artifactId>cloud-api-commons</artifactId>
+        <version>${project.version}</version>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-devtools</artifactId>
+        <scope>runtime</scope>
+        <optional>true</optional>
+    </dependency>
+    <dependency>
+        <groupId>org.projectlombok</groupId>
+        <artifactId>lombok</artifactId>
+        <optional>true</optional>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-test</artifactId>
+        <scope>test</scope>
+    </dependency>
+</dependencies>
+```
+
+##### （3）写yml
+
+~~~java
+server:
+  port: 8001
+
+spring:
+  application:
+    name: cloud-provider-hystrix-payment
+
+eureka:
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      #defaultZone: http://eureka7001.com:7001/eureka,http://eureka7002.com:7002/eureka
+      defaultZone: http://eureka7001.com:7001/eureka
+~~~
+
+##### （4）主启动
+
+```java
+package com.atguigu.springcloud;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.netflix.eureka.EnableEurekaClient;
+
+@SpringBootApplication
+@EnableEurekaClient
+public class PaymentHystrixMain8001 {
+    public static void main(String[] args) {
+        SpringApplication.run(PaymentHystrixMain8001.class, args);
+    }
+}
+```
+
+##### （5）业务类
+
+**1.service**
+
+```java
+package com.atguigu.springcloud.service;
+
+import org.springframework.stereotype.Service;
+
+import java.util.concurrent.TimeUnit;
+
+@Service
+public class PaymentService {
+    /**
+     * 正常访问
+     */
+    public String paymentInfo_ok(Integer id){
+        return "线程池：   " + Thread.currentThread().getName() + "paymentInfo_ok, id:  " + id + "\t" + "O(∩_∩)O哈哈哈~";
+    }
+    /**
+     * 模拟超时访问
+     */
+    public String paymentInfo_timeout(Integer id){
+        try {
+            TimeUnit.SECONDS.sleep(3);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        return "线程池：   " + Thread.currentThread().getName() + "paymentInfo_timeout, id:  " + id + "\t" + "呜呜呜~";
+    }
+}
+```
+
+**2.controller**
+
+```java
+package com.atguigu.springcloud.controller;
+
+import com.atguigu.springcloud.service.PaymentService;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RestController;
+
+import javax.annotation.Resource;
+
+@RestController
+@Slf4j
+public class PaymentController {
+    @Resource
+    PaymentService paymentService;
+
+    @GetMapping("/payment/hystrix/ok/{id}")
+    public String paymentInfo_ok(@PathVariable("id") Integer id){
+        return paymentService.paymentInfo_ok(id);
+    }
+
+    @GetMapping("/payment/hystrix/timeout/{id}")
+    public String paymentInfo_timeout(@PathVariable("id") Integer id){
+        return paymentService.paymentInfo_timeout(id);
+    }
+}
+```
+
+##### （6）正常测试
+
+启动eureka7001和hystrix8001,
+
+访问：	---》》》		
+
+模拟超时的（延迟3s）：[hystrix_timeout](http://localhost:8001/payment/hystrix/timeout/1)
+
+正常访问：[hystrix_ok](http://localhost:8001/payment/hystrix/ok/1)
+
+#### 2.高并发测试
+
+
+
+#### 3.故障测试和导致原因
+
+
+
+#### 4.上诉结论
+
+
+
+#### 5.如何解决？解决的要求
+
+
+
+## （4）hystrix工作原理
+
+
+
+## （5）服务监控hystrixDashBoard
 
 
 
