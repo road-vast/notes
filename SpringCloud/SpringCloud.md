@@ -2183,6 +2183,8 @@ public String paymentFeignTimeout(){
 
 ==超时控制由ribbon进行控制==
 
+80配置文件配置：
+
 ```java
 #设置feign客户端超时时间(OpenFeign默认支持ribbon)
 ribbon:
@@ -2473,17 +2475,525 @@ public class PaymentController {
 
 #### 2.高并发测试
 
+##### ==（1）安装Jmeter==
 
+[Jmeter下载网址](https://jmeter.apache.org/download_jmeter.cgi)
+
+![image-20200513091636522](D:\notes\SpringCloud\images\安装Jmeter1.png)
+
+**配置环境**
+
+~~~
+JMETER_HOME		D:\sofeware\Jmeter\apache-jmeter-5.2.1
+classpath		%JMETER_HOME%\lib\ext\ApacheJMeter_core.jar;%JMETER_HOME%\lib\jorphan.jar;%JMETER_HOME%\lib/logkit-2.0.jar;
+~~~
+
+运行bin目录下的Jmeter.bat，出现GUI界面
+
+![image-20200513092059638](D:\notes\SpringCloud\images\安装Jmeter2.png)
+
+设置为中文：
+
+![image-20200513092858160](D:\notes\SpringCloud\images\安装Jmeter3.png)
+
+##### （2）Jmeter压测测试（模拟高并发）：
+
+开启Jmeter，来20000个并发压死8001，20000个请求都去访问
+
+http://localhost:8001/payment/hystrix/timeout/1)
+
+![image-20200513094502121](D:\notes\SpringCloud\images\hystrix案例1.png)
+
+![image-20200513094550665](D:\notes\SpringCloud\images\hystrix案例2.png)
+
+==编辑完之后进行保存==
+
+![image-20200513094613143](D:\notes\SpringCloud\images\hystrix案例3.png)
+
+![image-20200513094630195](D:\notes\SpringCloud\images\hystrix案例4.png)
+
+再来一个访问：[hystrix_ok](http://localhost:8001/payment/hystrix/ok/1)		**请求结果：请求会卡顿**
+
+为什么会卡死？
+
+![image-20200513095314625](D:\notes\SpringCloud\images\hystrix案例5.png)
+
+##### （3）Jmeter压测结论:
+
+![image-20200513095539298](D:\notes\SpringCloud\images\hystrix案例6.png)
+
+##### （4）80新建加入:
+
+###### 1.新建cloud-consumer-feign-hystrix-order80
+
+###### 2.改POM文件
+
+```java
+<dependencies>
+    <!--openfeign-->
+    <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-starter-openfeign</artifactId>
+    </dependency>
+    <!--hystrix-->
+    <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-starter-netflix-hystrix</artifactId>
+    </dependency>
+    <!--eureka client-->
+    <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+    </dependency>
+    <!-- 引入自己定义的api通用包，可以使用Payment支付Entity -->
+    <dependency>
+        <groupId>com.atguigu.springcloud</groupId>
+        <artifactId>cloud-api-commons</artifactId>
+        <version>${project.version}</version>
+    </dependency>
+    <!--web-->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+    <!--一般基础通用配置-->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-devtools</artifactId>
+        <scope>runtime</scope>
+        <optional>true</optional>
+    </dependency>
+    <dependency>
+        <groupId>org.projectlombok</groupId>
+        <artifactId>lombok</artifactId>
+        <optional>true</optional>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-test</artifactId>
+        <scope>test</scope>
+    </dependency>
+</dependencies>
+```
+
+###### 3.写YML
+
+```java
+server:
+  port: 80
+
+eureka:
+  client:
+    register-with-eureka: false
+    service-url:
+      defaultZone: http://eureka7001.com:7001/eureka/
+
+feign:
+  hystrix:
+    enabled: true
+```
+
+###### 4.主启动
+
+```java
+package com.atguigu.springcloud;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.openfeign.EnableFeignClients;
+
+@SpringBootApplication
+@EnableFeignClients
+public class OrderHystrixMain80 {
+    public static void main(String[] args) {
+        SpringApplication.run(OrderHystrixMain80.class, args);
+    }
+}
+```
+
+###### 5.业务类
+
+service：
+
+```java
+package com.atguigu.springcloud.service;
+
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+
+@Component
+@FeignClient(value = "CLOUD-PROVIDER-HYSTRIX-PAYMENT")
+public interface PaymentHystrixService {
+    @GetMapping("/payment/hystrix/ok/{id}")
+    public String paymentInfo_ok(@PathVariable("id") Integer id);
+
+    @GetMapping("/payment/hystrix/timeout/{id}")
+    public String paymentInfo_timeout(@PathVariable("id") Integer id);
+}
+```
+
+controller：
+
+```java
+package com.atguigu.springcloud.controller;
+
+import com.atguigu.springcloud.service.PaymentHystrixService;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RestController;
+
+import javax.annotation.Resource;
+
+@RestController
+@Slf4j
+public class OrderHystrixController {
+    @Resource
+    PaymentHystrixService paymentHystrixService;
+    @GetMapping("/consumer/payment/hystrix/ok/{id}")
+    public String paymentInfo_ok(@PathVariable("id") Integer id){
+        return paymentHystrixService.paymentInfo_ok(id);
+    }
+
+    @GetMapping("/consumer/payment/hystrix/timeout/{id}")
+    public String paymentInfo_timeout(@PathVariable("id") Integer id){
+        return paymentHystrixService.paymentInfo_timeout(id);
+    }
+}
+```
+
+###### 6.正常测试
+
+[orderHystrix_ok](http://localhost/consumer/payment/hystrix/ok/1)
+
+###### 7.高并发测试
 
 #### 3.故障测试和导致原因
 
-
+![image-20200513105522346](D:\notes\SpringCloud\images\hystrix案例7.png)
 
 #### 4.上诉结论
 
-
+![image-20200513105610601](D:\notes\SpringCloud\images\hystrix案例8.png)
 
 #### 5.如何解决？解决的要求
+
+![image-20200513105919162](D:\notes\SpringCloud\images\hystrix案例10.png)
+
+![image-20200513110052593](D:\notes\SpringCloud\images\hystrix案例10附加.png)
+
+#### 6.服务降级
+
+##### （1）降级配置
+
+@HystrixCommand
+
+##### （2）8001先从自身找问题
+
+![image-20200513113150709](D:\notes\SpringCloud\images\hystrix案例11.png)
+
+##### （3）8001 fallback
+
+service（业务类启动）：
+
+```java
+package com.atguigu.springcloud.service;
+
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixProperty;
+import org.springframework.stereotype.Service;
+
+import java.util.concurrent.TimeUnit;
+
+@Service
+public class PaymentService {
+    /**
+     * 正常访问
+     */
+    public String paymentInfo_ok(Integer id){
+        return "线程池：   " + Thread.currentThread().getName() + "paymentInfo_ok, id:  " + id + "\t" + "O(∩_∩)O哈哈哈~";
+    }
+    /**
+     * 模拟超时访问
+     */
+    @HystrixCommand(fallbackMethod = "paymentInfo_timeoutHandler", commandProperties = {
+            //表示允许服务超时3s，超过3秒则会使用服务降级
+            @HystrixProperty(name="execution.isolation.thread.timeoutInMilliseconds", value = "3000")
+    })
+    public String paymentInfo_timeout(Integer id){
+//        int num = 10 / 0;
+        int timeout = 5;
+        try {
+            TimeUnit.SECONDS.sleep(timeout);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        return "线程池：   " + Thread.currentThread().getName() + "paymentInfo_timeout, id:  " + id + "\t" + "耗时" + timeout + "秒哈哈哈~";
+    }
+    public String paymentInfo_timeoutHandler(Integer id){
+        return "线程池：   " + Thread.currentThread().getName() + "系统繁忙或者运行报错，请稍后再试, id:  " + id + "\t" + "呜呜呜~";
+    }
+}
+```
+
+main （主启动类激活：添加注解@EnableCircuitBreaker）：
+
+```java
+package com.atguigu.springcloud;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.client.circuitbreaker.EnableCircuitBreaker;
+import org.springframework.cloud.netflix.eureka.EnableEurekaClient;
+
+@SpringBootApplication
+@EnableEurekaClient
+@EnableCircuitBreaker
+public class PaymentHystrixMain8001 {
+    public static void main(String[] args) {
+        SpringApplication.run(PaymentHystrixMain8001.class, args);
+    }
+}
+```
+
+##### （4）80 fallback
+
+==*重点==
+
+![image-20200513134913173](D:\notes\SpringCloud\images\hystrix案例12.png)
+
+1）改yml
+
+```java
+feign:
+  hystrix:
+    enabled: true
+```
+
+2）主启动
+
+```java
+package com.atguigu.springcloud;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.netflix.hystrix.EnableHystrix;
+import org.springframework.cloud.openfeign.EnableFeignClients;
+
+@SpringBootApplication
+@EnableFeignClients
+@EnableHystrix
+public class OrderHystrixMain80 {
+    public static void main(String[] args) {
+        SpringApplication.run(OrderHystrixMain80.class, args);
+    }
+}
+```
+
+3）业务类
+
+
+
+##### （5）目前问题
+
+![image-20200513145939915](D:\notes\SpringCloud\images\hystrix案例13.png)
+
+##### （6）解决问题
+
+###### 1）解决每个方法配置一个fallback的问题：
+
+设置一个全局fallback
+
+![image-20200513150345504](D:\notes\SpringCloud\images\hystrix案例14.png)
+
+controller
+
+```java
+package com.atguigu.springcloud.controller;
+
+import com.atguigu.springcloud.service.PaymentHystrixService;
+import com.netflix.hystrix.contrib.javanica.annotation.DefaultProperties;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixProperty;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RestController;
+
+import javax.annotation.Resource;
+
+@RestController
+@Slf4j
+@DefaultProperties(defaultFallback = "payment_Global_FallbackMethod")
+public class OrderHystrixController {
+    @Resource
+    PaymentHystrixService paymentHystrixService;
+    @GetMapping("/consumer/payment/hystrix/ok/{id}")
+    public String paymentInfo_ok(@PathVariable("id") Integer id){
+        return paymentHystrixService.paymentInfo_ok(id);
+    }
+
+    /**
+     * 客户端模拟超时异常，出错异常
+     * @param id
+     * @return
+     */
+    @GetMapping("/consumer/payment/hystrix/timeout/{id}")
+//    @HystrixCommand(fallbackMethod = "paymentTimeOutFallbackMethod",commandProperties = {
+//            @HystrixProperty(name="execution.isolation.thread.timeoutInMilliseconds",value="6000")
+//    })
+    @HystrixCommand
+    public String paymentInfo_TimeOut(@PathVariable("id") Integer id)
+    {
+//        int age = 10/0;
+        String result = paymentHystrixService.paymentInfo_timeout(id);
+        return result;
+    }
+    public String paymentTimeOutFallbackMethod(@PathVariable("id") Integer id)
+    {
+        return "我是消费者80,对方支付系统繁忙请10秒钟后再试或者自己运行出错请检查自己,o(╥﹏╥)o";
+    }
+    //下面是全局fallback方法
+    public String payment_Global_FallbackMethod(){
+        return "Global异常处理信息，请稍后再试，/(ㄒoㄒ)/~~";
+    }
+}
+```
+
+###### 2）解决和业务逻辑混在一起的问题：
+
+只需要为Feign客户端定义的接口添加一个服务降级处理的实现类即可实现解耦
+
+service接口
+
+```java
+package com.atguigu.springcloud.service;
+
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixProperty;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+
+@Component
+//实现服务降级的类
+@FeignClient(value = "CLOUD-PROVIDER-HYSTRIX-PAYMENT", fallback = PaymentFallbackService.class)
+public interface PaymentHystrixService {
+    @GetMapping("/payment/hystrix/ok/{id}")
+    public String paymentInfo_ok(@PathVariable("id") Integer id);
+    @GetMapping("/payment/hystrix/timeout/{id}")
+    public String paymentInfo_timeout(@PathVariable("id") Integer id);
+}
+```
+
+实现service接口：
+
+```java
+package com.atguigu.springcloud.service;
+
+import org.springframework.stereotype.Component;
+
+@Component
+
+public class PaymentFallbackService implements PaymentHystrixService{
+    @Override
+    public String paymentInfo_ok(Integer id) {
+        return "----PaymentFallbackService fall back-paymentInfo_OK /(ㄒoㄒ)/~~";
+    }
+
+    @Override
+    public String paymentInfo_timeout(Integer id) {
+        return "----PaymentFallbackService fall back-paymentInfo_Timeout /(ㄒoㄒ)/~~";
+    }
+}
+```
+
+演示支付者模块运行异常，超时异常，宕机异常，消费者模块进行服务降级；
+
+例如：关闭8001支付模块，访问		[order_hystrix_ok](http://localhost/consumer/payment/hystrix/ok/1)
+
+客户端调用处理fallback的service接口实现类的对应的方法
+
+#### 7.服务熔断
+
+##### （1）熔断是什么？
+
+![image-20200513180809597](D:\notes\SpringCloud\images\hystrix案例15.png)
+
+##### （2）实操：
+
+修改hystrix-8001：
+
+
+
+hystrix-payment8001-PaymentService：
+
+```java
+//==========服务熔断
+@HystrixCommand(fallbackMethod = "paymentCircuitBreaker_fallback",commandProperties = {
+        @HystrixProperty(name = "circuitBreaker.enabled",value = "true"),// 是否开启断路器
+        @HystrixProperty(name = "circuitBreaker.requestVolumeThreshold",value = "10"),// 请求次数
+        @HystrixProperty(name = "circuitBreaker.sleepWindowInMilliseconds",value = "10000"), // 时间窗口期
+        @HystrixProperty(name = "circuitBreaker.errorThresholdPercentage",value = "60"),// 失败率达到多少后跳闸
+})
+public String paymentCircuitBreaker(@PathVariable("id") Integer id) {
+    if(id < 0) {
+        throw new RuntimeException("******id 不能负数");
+    }
+    //hutool工具类里的方法，相当于UUId.randomUUId.toString()
+    String serialNumber = IdUtil.simpleUUID();
+
+    return Thread.currentThread().getName()+"\t"+"调用成功，流水号: " + serialNumber;
+}
+public String paymentCircuitBreaker_fallback(@PathVariable("id") Integer id) {
+    return "id 不能负数，请稍后再试，/(ㄒoㄒ)/~~   id: " +id;
+}
+```
+
+hystrix-payment8001-PaymentController：
+
+```java
+//=====服务熔断
+@GetMapping("/payment/circuit/{id}")
+public String paymentCircuitBreaker(@PathVariable("id") Integer id){
+    String result = paymentService.paymentCircuitBreaker(id);
+    log.info("****result : " + result);
+    return result;
+}
+```
+
+测试：
+
+多次访问 传负数参数请求导致fallback：		[payment-circuit-8001](http://localhost:8001/payment/circuit/-1)
+
+多次fallback之后（失败率达到60%之后）会导致服务熔断，之后继续请求之后失败率低于60%之后服务熔断恢复
+
+![image-20200514104153299](D:\notes\SpringCloud\images\hystrix案例16.png)
+
+![image-20200514104215464](D:\notes\SpringCloud\images\hystrix案例17.png)
+
+![image-20200514104236667](D:\notes\SpringCloud\images\hystrix案例18.png)
+
+##### （3）原理（小总结）：
+
+![image-20200514105041740](D:\notes\SpringCloud\images\hystrix案例19.png)
+
+![image-20200514105102139](D:\notes\SpringCloud\images\hystrix案例20.png)
+
+![image-20200514105121089](D:\notes\SpringCloud\images\hystrix案例21.png)
+
+![image-20200514105138175](D:\notes\SpringCloud\images\hystrix案例22.png)
+
+#### 8.服务限流
 
 
 
@@ -2492,6 +3002,182 @@ public class PaymentController {
 
 
 ## （5）服务监控hystrixDashBoard
+
+### 1.概述：
+
+![image-20200514121510820](D:\notes\SpringCloud\images\hystrix案例23.png)
+
+### 2.仪表盘9001：
+
+#### 1）新建cloud-consumer-hystrix-dashboard9001
+
+#### 2）改POM
+
+```java
+<dependencies>
+    <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-starter-netflix-hystrix-dashboard</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-devtools</artifactId>
+        <scope>runtime</scope>
+        <optional>true</optional>
+    </dependency>
+    <dependency>
+        <groupId>org.projectlombok</groupId>
+        <artifactId>lombok</artifactId>
+        <optional>true</optional>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-test</artifactId>
+        <scope>test</scope>
+    </dependency>
+</dependencies>
+```
+
+#### 3）写yml
+
+```java
+server:
+  port: 9001
+```
+
+#### 4）主启动
+
+```java
+package com.atguigu.springcloud;
+
+import org.springframework.beans.factory.SmartInitializingSingleton;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.netflix.hystrix.dashboard.EnableHystrixDashboard;
+
+@SpringBootApplication
+@EnableHystrixDashboard
+public class HystrixDashboardMain9001 {
+    public static void main(String[] args) {
+        SpringApplication.run(HystrixDashboardMain9001.class, args);
+    }
+}
+```
+
+#### 5）所有Provider微服务提供类（8001/8002/8003）都需要监控依赖配置
+
+![image-20200514124821532](D:\notes\SpringCloud\images\hystrix案例24.png)
+
+#### 6）启动，访问：			----》》》		[hystrix-dashboard](http://localhost:9001/hystrix)
+
+![image-20200514125143777](D:\notes\SpringCloud\images\hystrix案例25.png)
+
+#### 7)修改cloud-provider-hystrix-payment8001
+
+注意：新版本Hystrix需要在主启动类MainAppHystrix8001中指定监控路径
+
+否则会报错：Unable to connect to Command Metric Stream.	404
+
+```java
+package com.atguigu.springcloud;
+
+import com.netflix.hystrix.contrib.metrics.eventstream.HystrixMetricsStreamServlet;
+import org.springframework.beans.factory.SmartInitializingSingleton;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.web.servlet.ServletRegistrationBean;
+import org.springframework.cloud.netflix.hystrix.dashboard.EnableHystrixDashboard;
+import org.springframework.context.annotation.Bean;
+
+@SpringBootApplication
+@EnableHystrixDashboard
+public class HystrixDashboardMain9001 {
+    public static void main(String[] args) {
+        SpringApplication.run(HystrixDashboardMain9001.class, args);
+    }
+    /**
+     *此配置是为了服务监控而配置，与服务容错本身无关，springcloud升级后的坑
+     *ServletRegistrationBean因为springboot的默认路径不是"/hystrix.stream"，
+     *只要在自己的项目里配置上下面的servlet就可以了
+     */
+    @Bean
+    public ServletRegistrationBean getServlet() {
+        HystrixMetricsStreamServlet streamServlet = new HystrixMetricsStreamServlet();
+        ServletRegistrationBean registrationBean = new ServletRegistrationBean(streamServlet);
+        registrationBean.setLoadOnStartup(1);
+        registrationBean.addUrlMappings("/hystrix.stream");
+        registrationBean.setName("HystrixMetricsStreamServlet");
+        return registrationBean;
+    }
+}
+```
+
+#### 8）监控测试：
+
+##### （1）启动eureka集群
+
+##### （2）观察监控窗口
+
+###### 第一：9001监控8001
+
+http://localhost:8001/hystrix.stream
+
+![image-20200514142156394](D:\notes\SpringCloud\images\hystrix服务监控1.png)
+
+###### 第二：测试地址
+
+[payment-circuit-true](http://localhost:8001/payment/circuit/1)
+
+[payment-circuit-false](http://localhost:8001/payment/circuit/-1)
+
+![image-20200514142905646](D:\notes\SpringCloud\images\hystrix服务监控2.png)
+
+![image-20200514142938197](D:\notes\SpringCloud\images\hystrix服务监控3.png)
+
+###### 第三：如何看？
+
+7色
+
+
+
+1圈
+
+![image-20200514143522124](D:\notes\SpringCloud\images\hystrix服务监控4.png)
+
+1线
+
+![image-20200514143603146](D:\notes\SpringCloud\images\hystrix服务监控5.png)
+
+整图说明：
+
+![image-20200514143627562](D:\notes\SpringCloud\images\hystrix服务监控6.png)
+
+![image-20200514143647780](D:\notes\SpringCloud\images\hystrix服务监控7.png)
+
+整图说明2：
+
+###### 第四：搞懂一个才能搞懂复杂的
+
+![image-20200514143702909](D:\notes\SpringCloud\images\hystrix服务监控8.png)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2601,5 +3287,23 @@ public class PaymentController {
 		<option value="SpringBootApplicationConfigurationType" />
 	</set>
 </option>
+~~~
+
+## 4.解决Spring Boot使用Feign客户端调用远程服务时出现：timed-out and no fallback available，failed and no fallback available的问题
+
+是熔断器超时导致的，可以修改客户端yml,如下：
+
+~~~java
+hystrix:
+    command:
+        default:
+            circuitBreaker:
+                sleepWindowInMilliseconds: 100000
+                forceClosed: true
+            execution:
+                isolation:
+                    thread:
+                        timeoutInMilliseconds: 60000
+    shareSecurityContext: true
 ~~~
 
